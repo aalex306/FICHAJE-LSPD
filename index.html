@@ -1,61 +1,107 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy"
-      content="default-src 'self' https:; connect-src 'self' https://script.google.com;">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Fichaje LSPD</title>
+
+  <!-- Permitir conexiones a Apps Script -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' https:; script-src 'self' https://script.google.com 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://script.google.com https://script.googleusercontent.com;">
+
   <style>
-    body { font-family: Arial, sans-serif; background: #0d1b2a; color: #fff; text-align: center; padding: 20px; }
-    .container { max-width: 400px; margin: auto; background: #1b263b; padding: 20px; border-radius: 10px; }
-    input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 6px; border: none; }
-    input { background: #415a77; color: #fff; }
-    button { background: #778da9; cursor: pointer; }
-    button:hover { background: #a3b5cc; }
-    .log { margin-top: 20px; background: #415a77; padding: 10px; border-radius: 6px; max-height: 200px; overflow-y: auto; text-align: left; }
+    body{font-family:Arial,Helvetica,sans-serif;background:#0d1b2a;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    .card{width:360px;background:#112233;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+    input,button{width:100%;padding:10px;margin-top:10px;border-radius:6px;border:0}
+    input{background:#203447;color:#fff}
+    button{background:#3b82f6;color:#fff;cursor:pointer}
+    .log{margin-top:14px;background:#203447;padding:10px;border-radius:6px;max-height:160px;overflow:auto;text-align:left;font-size:13px}
+    .small{font-size:12px;color:#cbd5e1}
+    iframe{display:none;}
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Fichaje LSPD</h2>
-    <input id="nombre" type="text" placeholder="Ingresa tu nombre" />
-    <button onclick="fichar()">Fichar</button>
+  <div class="card">
+    <h2 style="margin:0 0 6px 0">Fichaje LSPD</h2>
+    <div class="small">Escribe tu nombre y pulsa fichar. No se requiere registro.</div>
+
+    <input id="nombre" type="text" placeholder="Nombre (ej: Juan Pérez)" autocomplete="off" />
+    <button id="btnFichar">Fichar</button>
 
     <div class="log" id="log"></div>
+
+    <hr style="border:none;height:1px;background:#1f3a55;margin-top:12px" />
+    <div class="small">Fallback: si tu navegador bloquea la petición, usa el botón de formulario.</div>
+
+    <!-- Form fallback que apunta al Apps Script (substituye la URL) -->
+    <form id="ficharForm" action="https://script.google.com/macros/s/AKfycbxWO3xJw7ElSjtqLkn4_HhUKrdrX0MPoCt480yxYzSeDB5T-SkuyaEVc8zQwqk9SaS-/exec" method="post" target="hidden_iframe">
+      <input name="nombre" id="formNombre" type="hidden" />
+      <button type="submit" style="margin-top:8px;background:#16a34a">Fichar (formulario)</button>
+    </form>
+
+    <iframe name="hidden_iframe" id="hidden_iframe"></iframe>
   </div>
 
-  <script>
-    function fichar() {
-      const nombre = document.getElementById("nombre").value.trim();
-      if (!nombre) {
-        alert("Por favor ingresa tu nombre.");
-        return;
-      }
-      const fecha = new Date().toLocaleString();
-      const log = document.getElementById("log");
-      const entry = document.createElement("div");
-      entry.textContent = `${nombre} fichó a las ${fecha}`;
-      log.prepend(entry);
+<script>
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxWO3xJw7ElSjtqLkn4_HhUKrdrX0MPoCt480yxYzSeDB5T-SkuyaEVc8zQwqk9SaS-/exec"; // <-- reemplaza aquí con tu URL completa
 
-      // Aquí puedes enviar el fichaje a tu Google Sheets
-      fetch("https://script.google.com/macros/s/AKfycbyvjf2MtBTh_90ZYHc15EUMV960g4LcgmZZtouARL-NBNpHCLUrawuBD1mkqluRxthL/exec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === "entrada") {
-          alert("Entrada registrada.");
-        } else if (data.status === "salida") {
-          alert(`Salida registrada. Tiempo: ${data.horas}`);
-        }
-      });,
-      //   body: JSON.stringify({ nombre, fecha })
-      // });
+function logMsg(text){
+  const log = document.getElementById('log');
+  const d = document.createElement('div');
+  d.textContent = (new Date().toLocaleString()) + " — " + text;
+  log.prepend(d);
+}
+
+async function ficharAjax(nombre){
+  try {
+    const res = await fetch(WEBAPP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      mode: "cors",
+      credentials: "omit",
+      body: JSON.stringify({ nombre })
+    });
+
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch(e) { data = { error: "Respuesta no JSON", raw: text }; }
+
+    if (!res.ok) {
+      logMsg("Error HTTP " + res.status + " — " + (data.error || text));
+      alert("Error al conectar: " + res.status + " — " + (data.error || text));
+      return;
     }
-  </script>
+
+    if (data.status === "entrada") {
+      logMsg(`${nombre} - Entrada registrada`);
+      alert("Entrada registrada.");
+    } else if (data.status === "salida") {
+      logMsg(`${nombre} - Salida registrada (${data.horas} horas)`);
+      alert("Salida registrada. Tiempo: " + data.horas + " horas");
+    } else if (data.error) {
+      logMsg("Error API: " + data.error);
+      alert("Error: " + data.error);
+    } else {
+      logMsg("Respuesta inesperada: " + JSON.stringify(data));
+      alert("Respuesta inesperada. Revisa consola.");
+    }
+  } catch (err) {
+    console.error(err);
+    logMsg("Fetch error: " + err.message);
+    alert("Fetch error: " + err.message + "\nSi el error es CSP intenta el botón de formulario.");
+  }
+}
+
+document.getElementById('btnFichar').addEventListener('click', function(){
+  const nombre = document.getElementById('nombre').value.trim();
+  if (!nombre) { alert("Introduce tu nombre"); return; }
+
+  // también rellenamos el form para fallback
+  document.getElementById('formNombre').value = nombre;
+
+  // Intentamos por AJAX primero
+  ficharAjax(nombre);
+});
+</script>
 </body>
 </html>
-
