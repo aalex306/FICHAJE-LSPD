@@ -5,15 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fichaje LSPD</title>
   <style>
-    <style>
     body { font-family: Arial, sans-serif; background: #0d1b2a; color: #fff; text-align: center; padding: 20px; }
     .container { max-width: 400px; margin: auto; background: #1b263b; padding: 20px; border-radius: 10px; }
     input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 6px; border: none; }
     input { background: #415a77; color: #fff; }
     button { background: #778da9; cursor: pointer; }
     button:hover { background: #a3b5cc; }
-    .log { margin-top: 20px; background: #415a77; padding: 10px; border-radius: 6px; max-height: 200px; overflow-y: auto; text-align: left; }
-  </style>
     .log { margin-top: 20px; background: #415a77; padding: 10px; border-radius: 6px; max-height: 200px; overflow-y: auto; text-align: left; }
   </style>
 </head>
@@ -33,43 +30,29 @@
         alert("Por favor ingresa tu nombre.");
         return;
       }
-
-      // Mostrar log visual
       const fecha = new Date().toLocaleString();
       const log = document.getElementById("log");
       const entry = document.createElement("div");
       entry.textContent = `${nombre} fichó a las ${fecha}`;
       log.prepend(entry);
 
-      // Enviar al Apps Script
+      // Aquí puedes enviar el fichaje a tu Google Sheets
       fetch("https://script.google.com/macros/s/AKfycbyvjf2MtBTh_90ZYHc15EUMV960g4LcgmZZtouARL-NBNpHCLUrawuBD1mkqluRxthL/exec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre })
       })
-      .then(async res => {
-        const text = await res.text();
-
-        let data;
-        try { data = JSON.parse(text); }
-        catch { 
-          alert("Error al leer la respuesta del servidor.");
-          return;
-        }
-
+      .then(res => res.json())
+      .then(data => {
         if (data.status === "entrada") {
           alert("Entrada registrada.");
         } else if (data.status === "salida") {
-          alert(`Salida registrada. Tiempo trabajado: ${data.horas} horas`);
-        } else if (data.error) {
-          alert("Error del servidor: " + data.error);
+          alert(`Salida registrada. Tiempo: ${data.horas}`);
         }
-      })
-      .catch(err => {
-        alert("Error al conectar con el servidor: " + err.message);
-      });
+      });,
+      //   body: JSON.stringify({ nombre, fecha })
+      // });
     }
   </script>
 </body>
 </html>
-
