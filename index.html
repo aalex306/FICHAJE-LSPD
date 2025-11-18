@@ -4,12 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fichaje LSPD</title>
-
-  <!-- Meta CSP permisivo para permitir fetch hacia Apps Script cuando sea posible.
-       Si tu host añade cabecera CSP, la cabecera HTTP tiene prioridad sobre este meta. -->
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com;">
-
   <style>
     body { font-family: Arial, sans-serif; background: #0d1b2a; color: #fff; text-align: center; padding: 20px; }
     .container { max-width: 400px; margin: auto; background: #1b263b; padding: 20px; border-radius: 10px; }
@@ -29,89 +23,48 @@
     <div class="log" id="log"></div>
   </div>
 
-  <!-- Formulario oculto como fallback (para cuando fetch esté bloqueado por CSP) -->
-  <form id="fallbackForm" action="https://script.google.com/macros/s/AKfycbxWO3xJw7ElSjtqLkn4_HhUKrdrX0MPoCt480yxYzSeDB5T-SkuyaEVc8zQwqk9SaS-/exec" method="post" target="hidden_iframe" style="display:none">
-    <input name="nombre" id="fallbackNombre" type="hidden" />
-  </form>
-  <iframe name="hidden_iframe" style="display:none"></iframe>
-
   <script>
-    // URL de tu Apps Script (ya puesta). Si cambias la implementación, actualiza aquí.
-    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxWO3xJw7ElSjtqLkn4_HhUKrdrX0MPoCt480yxYzSeDB5T-SkuyaEVc8zQwqk9SaS-/exec";
+    function fichar() {
+      const nombre = document.getElementById("nombre").value.trim();
+      if (!nombre) {
+        alert("Por favor ingresa tu nombre.");
+        return;
+      }
 
-    function logLocal(text) {
+      // Mostrar log visual
+      const fecha = new Date().toLocaleString();
       const log = document.getElementById("log");
       const entry = document.createElement("div");
-      entry.textContent = `${new Date().toLocaleString()} — ${text}`;
+      entry.textContent = `${nombre} fichó a las ${fecha}`;
       log.prepend(entry);
-    }
 
-    async function tryFetchFichaje(nombre) {
-      // Intentamos enviar por fetch JSON
-      try {
-        const res = await fetch(WEBAPP_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          mode: "cors",
-          body: JSON.stringify({ nombre })
-        });
+      // Enviar al Apps Script
+      fetch("https://script.google.com/macros/s/AKfycbyvjf2MtBTh_90ZYHc15EUMV960g4LcgmZZtouARL-NBNpHCLUrawuBD1mkqluRxthL/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre })
+      })
+      .then(async res => {
+        const text = await res.text();
 
-        const bodyText = await res.text();
         let data;
-        try { data = JSON.parse(bodyText); } catch (e) { data = { error: "Respuesta no JSON", raw: bodyText }; }
-
-        if (!res.ok) {
-          // servidor respondió con error HTTP
-          logLocal(`Error HTTP ${res.status} — ${data.error || bodyText}`);
-          alert("Error al enviar: " + (data.error || ("HTTP " + res.status)));
+        try { data = JSON.parse(text); }
+        catch { 
+          alert("Error al leer la respuesta del servidor.");
           return;
         }
 
         if (data.status === "entrada") {
           alert("Entrada registrada.");
-          logLocal(`${nombre} — Entrada registrada`);
         } else if (data.status === "salida") {
-          alert("Salida registrada. Tiempo: " + data.horas + " horas");
-          logLocal(`${nombre} — Salida registrada (${data.horas} horas)`);
+          alert(`Salida registrada. Tiempo trabajado: ${data.horas} horas`);
         } else if (data.error) {
-          alert("Error: " + data.error);
-          logLocal(`${nombre} — Error API: ${data.error}`);
-        } else {
-          logLocal(`${nombre} — Respuesta inesperada: ${JSON.stringify(data)}`);
-          alert("Respuesta inesperada del servidor.");
+          alert("Error del servidor: " + data.error);
         }
-      } catch (err) {
-        // Puede ser CSP / network error / blocked by client
-        console.warn("Fetch fallo:", err);
-        throw err; // lo lanzamos para que el llamador haga fallback
-      }
-    }
-
-    function submitFallback(nombre) {
-      // Enviar por formulario oculto (no requiere fetch / CORS)
-      document.getElementById("fallbackNombre").value = nombre;
-      document.getElementById("fallbackForm").submit();
-      logLocal(`${nombre} — Enviado por formulario (fallback)`);
-      alert("Petición enviada (fallback). Si no ves el cambio, revisa los permisos de la Web App.");
-    }
-
-    // Función global llamada desde el botón: mantiene apariencia (onclick)
-    async function fichar() {
-      const nombreEl = document.getElementById("nombre");
-      const nombre = nombreEl.value.trim();
-      if (!nombre) { alert("Por favor ingresa tu nombre."); nombreEl.focus(); return; }
-
-      // Mostramos en log inmediatamente (UX rápido)
-      logLocal(`${nombre} fichó (intentando enviar...)`);
-
-      // Intentamos fetch; si falla, usamos fallback por formulario
-      try {
-        await tryFetchFichaje(nombre);
-      } catch (err) {
-        // Detectar si es un fallo por CSP / bloqueo => usar fallback
-        // Mensajes típicos: "Failed to fetch", "NetworkError", or CSP in console
-        submitFallback(nombre);
-      }
+      })
+      .catch(err => {
+        alert("Error al conectar con el servidor: " + err.message);
+      });
     }
   </script>
 </body>
